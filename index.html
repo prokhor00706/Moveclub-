@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>MOVE CLUB — Трекер</title>
+
+  <!-- Telegram Mini App SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg:       #FAFAF8;
+      --bg2:      #F2F0EC;
+      --bg3:      #E8E3DC;
+      --fg:       #1C1917;
+      --fg2:      #6B6560;
+      --fg3:      #A09890;
+      --burg:     #5C1A30;
+      --burg2:    #7D2441;
+      --camel:    #B8936A;
+      --camel2:   #D4AF8A;
+      --gold:     #C9943A;
+      --line:     #E0DDD8;
+      --white:    #FFFFFF;
+      --card:     #FFFFFF;
+      --yoga:     #5C1A30;
+      --pilates:  #2C4A3E;
+      --stretch:  #3A3060;
+      --radius:   14px;
+      --tab-h:    60px;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg:    #100D0B;
+        --bg2:   #1A1612;
+        --bg3:   #252018;
+        --fg:    #F0EDE8;
+        --fg2:   #9A948E;
+        --fg3:   #5C5650;
+        --burg:  #A0364F;
+        --burg2: #C04460;
+        --camel: #C9A47C;
+        --camel2:#E0C09A;
+        --gold:  #DBA94A;
+        --line:  #2A2520;
+        --white: #1E1A16;
+        --card:  #1E1A16;
+        color-scheme: dark;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg:#100D0B;--bg2:#1A1612;--bg3:#252018;--fg:#F0EDE8;--fg2:#9A948E;
+      --fg3:#5C5650;--burg:#A0364F;--burg2:#C04460;--camel:#C9A47C;--camel2:#E0C09A;
+      --gold:#DBA94A;--line:#2A2520;--white:#1E1A16;--card:#1E1A16;color-scheme:dark;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: 'Inter', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    /* ── Intro splash ── */
+    #intro-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: #000;
+      transition: opacity 1s ease;
+    }
+    #intro-splash.hiding {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #intro-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    #intro-skip {
+      position: absolute;
+      bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+      right: 20px;
+      background: rgba(255,255,255,.18);
+      border: 1px solid rgba(255,255,255,.3);
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: .08em;
+      padding: 8px 16px;
+      border-radius: 100px;
+      cursor: pointer;
+      opacity: 0;
+      animation: fadeInSkip .5s ease 1.5s forwards;
+      backdrop-filter: blur(8px);
+    }
+    @keyframes fadeInSkip { to { opacity: 1; } }
+
+    /* ── Shell ── */
+    .app {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      max-width: 480px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    /* ── Top bar ── */
+    .topbar {
+      padding: calc(14px + env(safe-area-inset-top, 0px)) 20px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+      background: var(--bg);
+      flex-shrink: 0;
+    }
+    .topbar-logo {
+      font-family: 'Playfair Display', serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--burg);
+      letter-spacing: .06em;
+    }
+    .topbar-logo span { color: var(--camel); }
+    .topbar-user {
+      font-size: 11px;
+      color: var(--fg3);
+      font-weight: 500;
+    }
+    .xp-pill {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--bg2);
+      border: 1px solid var(--line);
+      border-radius: 100px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gold);
+      letter-spacing: .02em;
+      font-variant-numeric: tabular-nums;
+    }
+    .xp-pill::before { content: '✦'; font-size: 10px; }
+
+    /* ── Scroll area ── */
+    .scroll {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .scroll::-webkit-scrollbar { display: none; }
+
+    /* ── Tab panels ── */
+    .panel { display: none; padding: 20px 20px 100px; }
+    .panel.active { display: block; }
+
+    /* ── Bottom tab bar ── */
+    .tabbar {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: calc(var(--tab-h) + env(safe-area-inset-bottom, 0px));
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      background: var(--bg);
+      border-top: 1px solid var(--line);
+      display: flex;
+      z-index: 100;
+    }
+    .tab {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: var(--fg3);
+      font-family: 'Inter', sans-serif;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: .04em;
+      transition: color .2s;
+      padding: 0;
+    }
+    .tab.active { color: var(--burg); }
+    .tab-icon { font-size: 20px; line-height: 1; }
+
+    /* ── TODAY panel ── */
+    .day-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .day-label {
+      font-size: 10px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--fg3);
+      margin-bottom: 4px;
+    }
+    .day-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--fg);
+      line-height: 1.1;
+    }
+    .day-title span { color: var(--burg); }
+    .streak-badge {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: linear-gradient(135deg, var(--gold), var(--camel));
+      border-radius: 12px;
+      padding: 10px 14px;
+      min-width: 56px;
+    }
+    .streak-num {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .streak-lbl {
+      font-size: 8px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.8);
+      margin-top: 2px;
+    }
+
+    .workout-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .workout-header {
+      padding: 18px 18px 14px;
+      color: #fff;
+      position: relative;
+    }
+    .workout-header.yoga    { background: linear-gradient(135deg, #3D1120, var(--yoga)); }
+    .workout-header.pilates { background: linear-gradient(135deg, #1A2E28, var(--pilates)); }
+    .workout-header.stretch { background: linear-gradient(135deg, #201C40, var(--stretch)); }
+    .workout-type {
+      font-size: 9px;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.55);
+      margin-bottom: 5px;
+    }
+    .workout-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1.15;
+    }
+    .workout-xp {
+      position: absolute;
+      top: 18px; right: 18px;
+      background: rgba(255,255,255,.15);
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 100px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255,255,255,.9);
+    }
+    .workout-body { padding: 16px 18px; }
+    .exercise-list { list-style: none; }
+    .exercise-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--line);
+      cursor: pointer;
+    }
+    .exercise-item:last-child { border-bottom: none; }
+    .exercise-check {
+      width: 22px; height: 22px;
+      border: 2px solid var(--line);
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .2s;
+    }
+    .exercise-item.done .exercise-check {
+      background: var(--burg);
+      border-color: var(--burg);
+      color: #fff;
+      font-size: 11px;
+    }
+    .exercise-item.done .exercise-check::after { content: '✓'; }
+    .exercise-name {
+      font-size: 13px;
+      color: var(--fg);
+      flex: 1;
+      transition: color .2s;
+    }
+    .exercise-item.done .exercise-name {
+      text-decoration: line-through;
+      color: var(--fg3);
+    }
+    .exercise-dur { font-size: 10px; color: var(--fg3); }
+
+    .complete-btn {
+      width: 100%;
+      margin-top: 14px;
+      padding: 13px;
+      background: var(--burg);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      cursor: pointer;
+      transition: background .2s, transform .1s;
+    }
+    .complete-btn:hover { background: var(--burg2); }
+    .complete-btn:active { transform: scale(.98); }
+    .complete-btn:disabled {
+      background: var(--bg3);
+      color: var(--fg3);
+      cursor: default;
+    }
+
+    .done-today {
+      text-align: center;
+      padding: 28px 20px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+    }
+    .done-today .big-emoji { font-size: 40px; margin-bottom: 10px; display: block; }
+    .done-today h3 {
+      font-family: 'Playfair Display', serif;
+      font-size: 18px; font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .done-today p { font-size: 13px; color: var(--fg2); line-height: 1.6; }
+
+    .spin-prompt {
+      background: linear-gradient(135deg, var(--gold), var(--camel));
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      cursor: pointer;
+      transition: opacity .2s;
+    }
+    .spin-prompt:hover { opacity: .9; }
+    .spin-prompt-text h4 { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 3px; }
+    .spin-prompt-text p  { font-size: 11px; color: rgba(255,255,255,.8); }
+    .spin-icon { font-size: 32px; flex-shrink: 0; }
+
+    /* ── PROGRESS ── */
+    .prog-stat-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .stat-tile {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px 12px;
+      text-align: center;
+    }
+    .stat-num {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--burg);
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .stat-lbl { font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--fg3); }
+
+    .prog-section-title {
+      font-size: 10px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--fg3);
+      margin-bottom: 12px;
+    }
+
+    .calendar {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+    .cal-weekdays {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+      margin-bottom: 6px;
+    }
+    .cal-wd {
+      text-align: center;
+      font-size: 8px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--fg3);
+      padding: 2px 0;
+    }
+    .cal-days {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+    .cal-day {
+      aspect-ratio: 1;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--fg3);
+      background: var(--bg2);
+      font-variant-numeric: tabular-nums;
+    }
+    .cal-day.today { background: var(--burg); color: #fff; font-weight: 700; }
+    .cal-day.done-yoga    { background: rgba(92,26,48,.2); color: var(--burg); }
+    .cal-day.done-pilates { background: rgba(44,74,62,.2); color: #2C4A3E; }
+    .cal-day.done-stretch { background: rgba(58,48,96,.2); color: #3A3060; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) .cal-day.done-yoga    { background: rgba(160,54,79,.25); color: var(--camel); }
+      :root:not([data-theme="light"]) .cal-day.done-pilates { background: rgba(44,74,62,.3);  color: #6DB89E; }
+      :root:not([data-theme="light"]) .cal-day.done-stretch { background: rgba(80,66,140,.3); color: #9A8ED4; }
+    }
+    .cal-day.future { opacity: .35; }
+
+    .type-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--fg2); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    .xp-log {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .xp-log-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+    .xp-log-row:last-child { border-bottom: none; }
+    .xp-log-icon { font-size: 18px; width: 28px; text-align: center; flex-shrink: 0; }
+    .xp-log-text { flex: 1; }
+    .xp-log-name { font-size: 12px; font-weight: 500; color: var(--fg); }
+    .xp-log-date { font-size: 10px; color: var(--fg3); margin-top: 1px; }
+    .xp-log-pts  { font-size: 13px; font-weight: 700; color: var(--gold); font-variant-numeric: tabular-nums; }
+
+    /* ── PRIZES ── */
+    .wheel-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .wheel-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 20px;
+      font-weight: 700;
+      text-align: center;
+    }
+    .wheel-sub { font-size: 12px; color: var(--fg2); text-align: center; line-height: 1.5; }
+    .wheel-cost {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg2);
+      border: 1px solid var(--line);
+      border-radius: 100px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gold);
+    }
+    .wheel-container {
+      position: relative;
+      width: min(280px, 80vw);
+      height: min(280px, 80vw);
+    }
+    .wheel-pointer {
+      position: absolute;
+      top: -8px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 24px;
+      z-index: 10;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,.3));
+    }
+    canvas#wheel {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      box-shadow: 0 8px 32px rgba(0,0,0,.15);
+    }
+    .spin-btn {
+      padding: 13px 40px;
+      background: linear-gradient(135deg, var(--burg), var(--burg2));
+      color: #fff;
+      border: none;
+      border-radius: 100px;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      cursor: pointer;
+      transition: opacity .2s, transform .1s;
+      box-shadow: 0 6px 20px rgba(92,26,48,.35);
+    }
+    .spin-btn:hover { opacity: .9; }
+    .spin-btn:active { transform: scale(.97); }
+    .spin-btn:disabled { background: var(--bg3); color: var(--fg3); box-shadow: none; cursor: default; }
+    .wheel-status {
+      font-size: 12px;
+      color: var(--fg2);
+      text-align: center;
+      min-height: 18px;
+    }
+    .prize-section-title {
+      font-size: 10px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--fg3);
+      margin-bottom: 12px;
+    }
+    .prize-list { display: flex; flex-direction: column; gap: 8px; }
+    .prize-item {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .prize-item.locked { opacity: .45; }
+    .prize-emoji { font-size: 22px; flex-shrink: 0; }
+    .prize-info { flex: 1; }
+    .prize-name { font-size: 13px; font-weight: 500; color: var(--fg); margin-bottom: 2px; }
+    .prize-desc { font-size: 10px; color: var(--fg3); }
+    .prize-badge {
+      font-size: 9px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 100px;
+    }
+    .prize-badge.won  { background: rgba(92,26,48,.1); color: var(--burg); }
+    .prize-badge.lock { background: var(--bg2); color: var(--fg3); }
+
+    /* ── Modal ── */
+    .modal-bg {
+      display: none;
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,.6);
+      backdrop-filter: blur(6px);
+      align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .modal-bg.open { display: flex; }
+    .modal {
+      background: var(--bg);
+      border-radius: 20px;
+      padding: 28px 24px;
+      max-width: 360px; width: 100%;
+      text-align: center;
+    }
+    .modal-emoji { font-size: 48px; margin-bottom: 12px; display: block; }
+    .modal h3 {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px; font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .modal p { font-size: 13px; color: var(--fg2); line-height: 1.6; margin-bottom: 20px; }
+    .modal-btn {
+      display: inline-block;
+      padding: 11px 28px;
+      background: var(--burg);
+      color: #fff;
+      border: none; border-radius: 100px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .modal-btn:hover { background: var(--burg2); }
+
+    @media (max-width: 400px) {
+      .prog-stat-row { grid-template-columns: 1fr 1fr; }
+      .prog-stat-row .stat-tile:last-child { grid-column: span 2; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── INTRO SPLASH ── -->
+<div id="intro-splash">
+  <video id="intro-video" playsinline autoplay muted>
+    <source src="hero.mp4" type="video/mp4">
+  </video>
+  <button id="intro-skip" onclick="hideSplash()">Пропустить</button>
+</div>
+
+<!-- ── APP SHELL ── -->
+<div class="app">
+
+  <div class="topbar">
+    <div class="topbar-logo">MOVE<span> CLUB</span></div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="topbar-user" id="tg-username"></div>
+      <div class="xp-pill" id="xp-display">0 XP</div>
+    </div>
+  </div>
+
+  <div class="scroll" id="scroll-area">
+
+    <!-- TODAY -->
+    <div class="panel active" id="panel-today">
+      <div class="day-header">
+        <div class="day-meta">
+          <div class="day-label" id="today-label">День 1</div>
+          <div class="day-title" id="today-title">Сегодня:<br><span id="today-type">Йога</span></div>
+        </div>
+        <div class="streak-badge">
+          <div class="streak-num" id="streak-num">0</div>
+          <div class="streak-lbl">дней подряд</div>
+        </div>
+      </div>
+      <div id="workout-area"></div>
+      <div class="spin-prompt" id="spin-prompt" hidden onclick="switchTab('prizes')">
+        <div class="spin-icon">🎡</div>
+        <div class="spin-prompt-text">
+          <h4>Крути колесо!</h4>
+          <p>Ты заработала очки — время за призом</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROGRESS -->
+    <div class="panel" id="panel-progress">
+      <div class="prog-stat-row">
+        <div class="stat-tile"><div class="stat-num" id="s-total">0</div><div class="stat-lbl">Тренировок</div></div>
+        <div class="stat-tile"><div class="stat-num" id="s-streak">0</div><div class="stat-lbl">Серия дней</div></div>
+        <div class="stat-tile"><div class="stat-num" id="s-xp">0</div><div class="stat-lbl">XP заработано</div></div>
+      </div>
+      <div class="prog-section-title">Октябрь 2026</div>
+      <div class="calendar">
+        <div class="cal-weekdays">
+          <div class="cal-wd">пн</div><div class="cal-wd">вт</div><div class="cal-wd">ср</div>
+          <div class="cal-wd">чт</div><div class="cal-wd">пт</div><div class="cal-wd">сб</div><div class="cal-wd">вс</div>
+        </div>
+        <div class="cal-days" id="cal-days"></div>
+      </div>
+      <div class="type-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--yoga)"></div>Йога</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--pilates)"></div>Пилатес</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--stretch)"></div>Растяжка</div>
+      </div>
+      <div class="prog-section-title">История тренировок</div>
+      <div class="xp-log" id="xp-log"><div style="padding:20px;text-align:center;font-size:13px;color:var(--fg3)">Пока тренировок нет — начни сегодня!</div></div>
+    </div>
+
+    <!-- PRIZES -->
+    <div class="panel" id="panel-prizes">
+      <div class="wheel-wrap">
+        <div>
+          <div class="wheel-title">Колесо фортуны</div>
+          <div class="wheel-sub" style="margin-top:4px">Заработай XP за тренировки<br>и крути колесо за призы</div>
+        </div>
+        <div class="wheel-cost">✦ <span>50 XP за прокрут</span></div>
+        <div class="wheel-container">
+          <div class="wheel-pointer">▼</div>
+          <canvas id="wheel" width="560" height="560"></canvas>
+        </div>
+        <div class="wheel-status" id="wheel-status"></div>
+        <button class="spin-btn" id="spin-btn" onclick="spinWheel()">Крутить!</button>
+      </div>
+      <div class="prize-section-title">Возможные призы</div>
+      <div class="prize-list" id="prize-list"></div>
+    </div>
+
+  </div>
+
+  <div class="tabbar">
+    <button class="tab active" id="tab-today"    onclick="switchTab('today')">
+      <div class="tab-icon">🏠</div>Сегодня
+    </button>
+    <button class="tab" id="tab-progress" onclick="switchTab('progress')">
+      <div class="tab-icon">📊</div>Прогресс
+    </button>
+    <button class="tab" id="tab-prizes"   onclick="switchTab('prizes')">
+      <div class="tab-icon">🎡</div>Призы
+    </button>
+  </div>
+</div>
+
+<div class="modal-bg" id="prize-modal">
+  <div class="modal">
+    <span class="modal-emoji" id="pm-emoji"></span>
+    <h3 id="pm-title"></h3>
+    <p id="pm-desc"></p>
+    <button class="modal-btn" onclick="closeModal()">Отлично!</button>
+  </div>
+</div>
+
+<script>
+// ── Telegram Mini App init ────────────────────────────────
+(function() {
+  try {
+    const tg = window.Telegram && window.Telegram.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand(); // раскрыть на весь экран
+      // Показать имя пользователя в шапке
+      const user = tg.initDataUnsafe && tg.initDataUnsafe.user;
+      if (user && user.first_name) {
+        document.getElementById('tg-username').textContent = user.first_name;
+      }
+      // Подхватить тему Telegram
+      if (tg.colorScheme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+      // Слушать смену темы
+      tg.onEvent('themeChanged', function() {
+        document.documentElement.setAttribute('data-theme', tg.colorScheme);
+        drawWheel(wheelAngle);
+      });
+    }
+  } catch(e) {}
+})();
+
+// ── Intro splash ─────────────────────────────────────────
+const splash = document.getElementById('intro-splash');
+const introVid = document.getElementById('intro-video');
+
+function hideSplash() {
+  splash.classList.add('hiding');
+  setTimeout(() => { splash.hidden = true; }, 1050);
+}
+
+introVid.addEventListener('ended', hideSplash);
+introVid.addEventListener('error', hideSplash); // если видео не загрузилось — всё равно скрыть
+
+// ── DATA ─────────────────────────────────────────────────
+const WORKOUTS = [
+  {
+    type: 'yoga', label: 'Йога', color: 'yoga', xp: 15,
+    name: 'Йога для начинающих',
+    exercises: [
+      { name: 'Тадасана — Поза горы',          dur: '2 мин' },
+      { name: 'Баласана — Поза ребёнка',        dur: '2 мин' },
+      { name: 'Кошка-Корова — разминка',        dur: '3 мин' },
+      { name: 'Собака мордой вниз',             dur: '3 мин' },
+      { name: 'Воин I — Вирабхадрасана',        dur: '2 мин' },
+      { name: 'Воин II — Вирабхадрасана II',    dur: '2 мин' },
+      { name: 'Шавасана — расслабление',        dur: '3 мин' },
+    ]
+  },
+  {
+    type: 'pilates', label: 'Пилатес', color: 'pilates', xp: 20,
+    name: 'Пилатес дома',
+    exercises: [
+      { name: 'Дыхание и активация кора',       dur: '3 мин' },
+      { name: 'The Hundred',                     dur: '3 мин' },
+      { name: 'Roll Up — скручивание',           dur: '3 мин' },
+      { name: 'Single Leg Stretch',              dur: '3 мин' },
+      { name: 'Double Leg Stretch',              dur: '3 мин' },
+      { name: 'Criss-Cross — косые мышцы',       dur: '3 мин' },
+    ]
+  },
+  {
+    type: 'stretch', label: 'Растяжка', color: 'stretch', xp: 12,
+    name: 'Растяжка: утро и вечер',
+    exercises: [
+      { name: 'Разминка шеи и плеч',            dur: '2 мин' },
+      { name: 'Боковые наклоны',                dur: '2 мин' },
+      { name: 'Растяжка квадрицепса стоя',      dur: '2 мин' },
+      { name: 'Наклон вперёд — хамстринги',     dur: '3 мин' },
+      { name: 'Голубь — раскрытие бёдер',       dur: '3 мин' },
+      { name: 'Растяжка грудного отдела',       dur: '2 мин' },
+      { name: 'Полное расслабление',            dur: '3 мин' },
+    ]
+  }
+];
+
+const PRIZES = [
+  { emoji:'📖', name:'Мини-гайд: 5 поз для спины',      desc:'PDF с упражнениями для здоровой спины' },
+  { emoji:'☀️', name:'Утренний ритуал за 3 минуты',      desc:'Экспресс-комплекс для заряда с утра' },
+  { emoji:'🧘', name:'Медитация на сон',                  desc:'Техника расслабления перед сном — аудио + текст' },
+  { emoji:'🥗', name:'Гайд: питание после тренировки',   desc:'5 простых рецептов для восстановления' },
+  { emoji:'✨', name:'Бонус ×2 XP',                       desc:'Следующая тренировка приносит двойные очки' },
+  { emoji:'💎', name:'Эксклюзивный урок йоги',           desc:'20-минутная практика от куратора клуба' },
+  { emoji:'🎁', name:'Ещё одна попытка!',                desc:'Крути ещё раз бесплатно' },
+  { emoji:'⭐', name:'+25 бонусных XP',                   desc:'Мгновенное пополнение баланса очков' },
+];
+
+const SPIN_COST = 50;
+
+// ── STATE ────────────────────────────────────────────────
+function loadState() {
+  try {
+    const s = localStorage.getItem('mc_state');
+    return s ? JSON.parse(s) : null;
+  } catch(e) { return null; }
+}
+function saveState(s) {
+  try { localStorage.setItem('mc_state', JSON.stringify(s)); } catch(e) {}
+}
+function today() { return new Date().toISOString().slice(0,10); }
+
+let STATE = loadState() || {
+  xp: 0, streak: 0, lastDone: null,
+  history: [], wonPrizes: [],
+  spinLastDate: null, dayOffset: 0
+};
+
+// ── TODAY ────────────────────────────────────────────────
+function getTodayWorkoutIndex() {
+  const first = STATE.history.length > 0 ? STATE.history[0].date : today();
+  const daysDiff = Math.floor((new Date(today()) - new Date(first)) / 86400000);
+  return (STATE.dayOffset + daysDiff) % 3;
+}
+
+function isTodayDone() { return STATE.lastDone === today(); }
+
+function buildWorkoutCard() {
+  const idx = getTodayWorkoutIndex();
+  const w = WORKOUTS[idx];
+  const done = isTodayDone();
+
+  document.getElementById('today-label').textContent = `День ${STATE.history.length + 1}`;
+  document.getElementById('today-type').textContent = w.label;
+
+  const area = document.getElementById('workout-area');
+
+  if (done) {
+    area.innerHTML = `
+      <div class="done-today">
+        <span class="big-emoji">🌟</span>
+        <h3>Тренировка выполнена!</h3>
+        <p>Отличная работа. Завтра тебя ждёт<br><strong>${WORKOUTS[(idx+1)%3].label}</strong>.</p>
+      </div>`;
+    document.getElementById('spin-prompt').hidden = false;
+    return;
+  }
+
+  document.getElementById('spin-prompt').hidden = true;
+  if (!window._checked) window._checked = {};
+
+  const items = w.exercises.map((ex, i) => {
+    const c = window._checked[i] ? 'done' : '';
+    return `<li class="exercise-item ${c}" onclick="toggleEx(${i})">
+      <div class="exercise-check"></div>
+      <div class="exercise-name">${ex.name}</div>
+      <div class="exercise-dur">${ex.dur}</div>
+    </li>`;
+  }).join('');
+
+  const allDone = Object.keys(window._checked).length === w.exercises.length;
+
+  area.innerHTML = `
+    <div class="workout-card">
+      <div class="workout-header ${w.color}">
+        <div class="workout-type">${w.label} · ${w.exercises.length} упражнений</div>
+        <div class="workout-name">${w.name}</div>
+        <div class="workout-xp">+${w.xp} XP</div>
+      </div>
+      <div class="workout-body">
+        <ul class="exercise-list">${items}</ul>
+        <button class="complete-btn" onclick="completeWorkout(${idx})" ${allDone?'':'disabled'}>
+          Завершить тренировку — +${w.xp} XP
+        </button>
+      </div>
+    </div>`;
+}
+
+function toggleEx(i) {
+  if (isTodayDone()) return;
+  if (window._checked[i]) delete window._checked[i];
+  else window._checked[i] = true;
+  buildWorkoutCard();
+}
+
+function completeWorkout(widx) {
+  const w = WORKOUTS[widx];
+  STATE.xp += w.xp;
+  const yesterday = new Date(new Date() - 86400000).toISOString().slice(0,10);
+  if (STATE.lastDone === yesterday) STATE.streak++;
+  else if (STATE.lastDone !== today()) STATE.streak = 1;
+  STATE.lastDone = today();
+  STATE.history.push({ date: today(), type: w.type, label: w.label, xp: w.xp });
+  window._checked = {};
+  saveState(STATE);
+  updateXPDisplay();
+  buildWorkoutCard();
+  buildProgress();
+  // Вибрация в Telegram
+  try { window.Telegram.WebApp.HapticFeedback.notificationOccurred('success'); } catch(e) {}
+}
+
+function updateXPDisplay() {
+  document.getElementById('xp-display').textContent = STATE.xp + ' XP';
+  document.getElementById('streak-num').textContent = STATE.streak;
+  document.getElementById('s-total').textContent  = STATE.history.length;
+  document.getElementById('s-streak').textContent = STATE.streak;
+  document.getElementById('s-xp').textContent     = STATE.xp;
+}
+
+// ── PROGRESS ─────────────────────────────────────────────
+function buildProgress() {
+  updateXPDisplay();
+  const calEl = document.getElementById('cal-days');
+  calEl.innerHTML = '';
+  const firstDayOfWeek = 3;
+  const daysInMonth = 31;
+  const todayDate = new Date().getDate();
+
+  for (let i = 0; i < firstDayOfWeek; i++) {
+    const el = document.createElement('div');
+    el.className = 'cal-day';
+    el.style.background = 'transparent';
+    calEl.appendChild(el);
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const el = document.createElement('div');
+    el.className = 'cal-day';
+    el.textContent = d;
+    const dateStr = `2026-10-${String(d).padStart(2,'0')}`;
+    const entry = STATE.history.find(h => h.date === dateStr);
+    if (d === todayDate) el.classList.add('today');
+    else if (d > todayDate) el.classList.add('future');
+    else if (entry) el.classList.add('done-' + entry.type);
+    calEl.appendChild(el);
+  }
+
+  const logEl = document.getElementById('xp-log');
+  if (STATE.history.length === 0) {
+    logEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;color:var(--fg3)">Пока тренировок нет — начни сегодня!</div>';
+  } else {
+    const typeEmoji = { yoga:'🧘', pilates:'💪', stretch:'🌿' };
+    logEl.innerHTML = [...STATE.history].reverse().slice(0,15).map(h => `
+      <div class="xp-log-row">
+        <div class="xp-log-icon">${typeEmoji[h.type] || '✦'}</div>
+        <div class="xp-log-text">
+          <div class="xp-log-name">${h.label}</div>
+          <div class="xp-log-date">${formatDate(h.date)}</div>
+        </div>
+        <div class="xp-log-pts">+${h.xp} XP</div>
+      </div>`).join('');
+  }
+}
+
+function formatDate(d) {
+  const months = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  const [y,m,day] = d.split('-');
+  return `${parseInt(day)} ${months[parseInt(m)-1]}`;
+}
+
+// ── WHEEL ────────────────────────────────────────────────
+const WHEEL_COLORS_LIGHT = ['#5C1A30','#B8936A','#2C4A3E','#C9943A','#3A3060','#7D2441','#4A7A6A','#8B6440'];
+const WHEEL_COLORS_DARK  = ['#A0364F','#C9A47C','#3D6B5C','#DBA94A','#5C4E9A','#C04460','#5DA090','#B08060'];
+let wheelAngle = 0;
+let isSpinning = false;
+
+function drawWheel(angle) {
+  const canvas = document.getElementById('wheel');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W/2, cy = H/2, r = W/2 - 4;
+  const n = PRIZES.length;
+  const arc = (Math.PI * 2) / n;
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+    (!document.documentElement.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme:dark)').matches);
+  const colors = dark ? WHEEL_COLORS_DARK : WHEEL_COLORS_LIGHT;
+
+  ctx.clearRect(0, 0, W, H);
+  for (let i = 0; i < n; i++) {
+    const start = angle + i * arc - Math.PI/2;
+    const end   = start + arc;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, start, end);
+    ctx.closePath();
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.12)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(start + arc/2);
+    ctx.translate(r * 0.62, 0);
+    ctx.rotate(Math.PI/2);
+    ctx.font = `${W * 0.075}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(PRIZES[i].emoji, 0, 0);
+    ctx.restore();
+  }
+  ctx.beginPath();
+  ctx.arc(cx, cy, W * 0.1, 0, Math.PI*2);
+  ctx.fillStyle = dark ? '#1A1612' : '#FAFAF8';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.2)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+function spinWheel() {
+  if (isSpinning) return;
+  if (STATE.xp < SPIN_COST) {
+    document.getElementById('wheel-status').textContent = `Нужно ${SPIN_COST} XP — у тебя ${STATE.xp} XP`;
+    return;
+  }
+  if (STATE.spinLastDate === today()) {
+    document.getElementById('wheel-status').textContent = 'Сегодня уже крутила — приходи завтра!';
+    return;
+  }
+
+  STATE.xp -= SPIN_COST;
+  saveState(STATE);
+  updateXPDisplay();
+  isSpinning = true;
+  document.getElementById('spin-btn').disabled = true;
+  document.getElementById('wheel-status').textContent = 'Крутится…';
+
+  try { window.Telegram.WebApp.HapticFeedback.impactOccurred('medium'); } catch(e) {}
+
+  const extraSpins = 5 + Math.random() * 3;
+  const prizeIdx = Math.floor(Math.random() * PRIZES.length);
+  const targetAngle = wheelAngle + Math.PI*2*extraSpins + (Math.PI*2 - (prizeIdx * Math.PI*2/PRIZES.length));
+  const duration = 4000;
+  const start = performance.now();
+  const startAngle = wheelAngle;
+
+  function easeOut(t) { return 1 - Math.pow(1 - t, 4); }
+
+  function animate(now) {
+    const t = Math.min((now - start) / duration, 1);
+    wheelAngle = startAngle + (targetAngle - startAngle) * easeOut(t);
+    drawWheel(wheelAngle);
+    if (t < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      wheelAngle = targetAngle % (Math.PI*2);
+      isSpinning = false;
+      STATE.spinLastDate = today();
+      STATE.wonPrizes.push(prizeIdx);
+      saveState(STATE);
+      buildPrizes();
+      updateXPDisplay();
+      document.getElementById('spin-btn').disabled = false;
+      document.getElementById('wheel-status').textContent = '';
+      try { window.Telegram.WebApp.HapticFeedback.notificationOccurred('success'); } catch(e) {}
+      showPrizeModal(PRIZES[prizeIdx]);
+    }
+  }
+  requestAnimationFrame(animate);
+}
+
+function showPrizeModal(prize) {
+  document.getElementById('pm-emoji').textContent = prize.emoji;
+  document.getElementById('pm-title').textContent = prize.name;
+  document.getElementById('pm-desc').textContent  = prize.desc;
+  document.getElementById('prize-modal').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('prize-modal').classList.remove('open');
+}
+
+function buildPrizes() {
+  const canSpin = STATE.xp >= SPIN_COST && STATE.spinLastDate !== today();
+  document.getElementById('spin-btn').disabled = !canSpin;
+  if (STATE.spinLastDate === today()) {
+    document.getElementById('wheel-status').textContent = 'Сегодня уже крутила — приходи завтра!';
+  } else if (STATE.xp < SPIN_COST) {
+    document.getElementById('wheel-status').textContent = `Нужно ещё ${SPIN_COST - STATE.xp} XP`;
+  } else {
+    document.getElementById('wheel-status').textContent = '';
+  }
+  document.getElementById('prize-list').innerHTML = PRIZES.map((p, i) => {
+    const timesWon = STATE.wonPrizes.filter(x => x === i).length;
+    const locked = timesWon === 0;
+    return `<div class="prize-item ${locked?'locked':''}">
+      <div class="prize-emoji">${p.emoji}</div>
+      <div class="prize-info">
+        <div class="prize-name">${p.name}</div>
+        <div class="prize-desc">${p.desc}</div>
+      </div>
+      ${locked ? '<span class="prize-badge lock">Не выпадал</span>'
+               : `<span class="prize-badge won">${timesWon}× выиграно</span>`}
+    </div>`;
+  }).join('');
+}
+
+// ── TABS ─────────────────────────────────────────────────
+function switchTab(name) {
+  ['today','progress','prizes'].forEach(t => {
+    document.getElementById('panel-'+t).classList.toggle('active', t===name);
+    document.getElementById('tab-'+t).classList.toggle('active', t===name);
+  });
+  document.getElementById('scroll-area').scrollTop = 0;
+  if (name === 'progress') buildProgress();
+  if (name === 'prizes') { buildPrizes(); drawWheel(wheelAngle); }
+}
+
+// ── INIT ─────────────────────────────────────────────────
+window._checked = {};
+buildWorkoutCard();
+buildProgress();
+window.matchMedia('(prefers-color-scheme:dark)').addEventListener('change', () => drawWheel(wheelAngle));
+requestAnimationFrame(() => drawWheel(wheelAngle));
+</script>
+</body>
+</html>
